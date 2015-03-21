@@ -22,11 +22,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--config-file', '-c',
-        default=os.path.expanduser('~/Temper/tempmon.yaml'),
+        default=os.path.expanduser('~/.tempmon/tempmon.yaml'),
+        help='Where to load configuration settings. Defaults to %(default)s',
     )
     parser.add_argument(
         '--log-file',
-        default=os.path.expanduser('~/Temper/tempmon.log'),
+        default=os.path.expanduser('~/.tempmon/tempmon.log'),
+        help='Where to write logs. Defaults to %(default)s',
     )
     parser.add_argument(
         '--verbose', '-v',
