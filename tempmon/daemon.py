@@ -44,7 +44,7 @@ def main():
 
     if args.pid_file:
         with open(args.pid_file, 'w') as f:
-            f.write(os.getpid())
+            f.write('%s\n' % os.getpid())
 
     # Configure logging to minimize disk space
     log = logging.getLogger('')
