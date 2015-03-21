@@ -26,9 +26,14 @@ def main():
         help='Where to load configuration settings. Defaults to %(default)s',
     )
     parser.add_argument(
-        '--log-file',
+        '--log-file', '-l',
         default=os.path.expanduser('~/.tempmon/tempmon.log'),
         help='Where to write logs. Defaults to %(default)s',
+    )
+    parser.add_argument(
+        '--pid-file', '-p',
+        default=None,
+        help='Where to write the pid file. Defaults to not writing one.',
     )
     parser.add_argument(
         '--verbose', '-v',
@@ -36,6 +41,10 @@ def main():
         default=False,
     )
     args = parser.parse_args()
+
+    if args.pid_file:
+        with open(args.pid_file, 'w') as f:
+            f.write(os.getpid())
 
     # Configure logging to minimize disk space
     log = logging.getLogger('')
