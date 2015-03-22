@@ -3,30 +3,38 @@
 =======================================
 
 tempmon uses temperusb_ to read temperature value from TEMPer_ sensors
-on the USB bus and publishes them to `plot.ly`_
+on the USB bus and OWM_ to find the local reported temperature and
+publishes the results to `plot.ly`_
 
 .. _temperusb: https://pypi.python.org/pypi/temperusb
 .. _TEMPer: http://www.amazon.com/gp/product/B002VA813U/ref=as_li_tl?ie=UTF8&camp=1789&creative=390957&creativeASIN=B002VA813U&linkCode=as2&tag=hellflynet-20&linkId=VHDXEZ2QB74BXBM5
 .. _plot.ly: https://plot.ly
+.. _OWM: http://openweathermap.org/
 
 Setup
 =====
 
-1. Sign up for a plot.ly account.
-2. From your `plot.ly settings page`_, create one stream token per
+#. Sign up for a plot.ly account.
+#. From your `plot.ly settings page`_, create one stream token per
    sensor device
-3. Install tempmon and its dependencies. A virtualenv works fine for
+#. Install tempmon and its dependencies. A virtualenv works fine for
    this.
+#. Sign up for a OWM account and find your API key on `your settings
+   page <http://openweathermap.org/my>`__.
 4. Create a configuration file using YAML syntax and containing at
    least the basic plot.ly authentication data:
 
     ::
 
-      username:
-      api-key:
-      stream-tokens:
-        - token1
-        - token2
+      plotly:
+        username:
+        api-key:
+        stream-tokens:
+          - token1
+          - token2
+      weather:
+        api-key:
+        place: "City, State"
 
 5. Run ``tempmon -c $CONFIG_FILENAME``.  Add ``-v`` to see the log
    output on the console for debugging.
