@@ -176,7 +176,6 @@ def main():
 
     # Connect to OWM weather service
     owm = pyowm.OWM(owm_api_key)
-    observation = owm.weather_at_place(owm_place)
 
     # Make sure our plotly login details work
     max_points = 24 * (60 / frequency) * retention_period
@@ -197,6 +196,7 @@ def main():
         x = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         # Reported temperature from OWM
         try:
+            observation = owm.weather_at_place(owm_place)
             w = observation.get_weather()
             temp = w.get_temperature('fahrenheit')['temp']
         except Exception:
