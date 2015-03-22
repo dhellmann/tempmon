@@ -89,6 +89,7 @@ def create_plot(username, api_key,
         yaxis=YAxis(
             title='Degrees %s' % units.title(),
         ),
+        showlegend=True,
     )
     fig = Figure(data=traces, layout=layout)
     LOG.info('Output graph visible at %s', py.plot(fig, filename=title))
