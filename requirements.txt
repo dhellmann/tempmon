@@ -1,4 +1,4 @@
 temperusb>=1.2.3
 plotly>=1.6.13
 PyYAML>=3.11
-pyowm>=2.2.0
+yweather>=0.1

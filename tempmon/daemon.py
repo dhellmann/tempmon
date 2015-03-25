@@ -7,9 +7,9 @@ import time
 
 import plotly.plotly as py
 from plotly.graph_objs import Scatter, Layout, Figure, YAxis
-import pyowm
 from temperusb import TemperHandler
 import yaml
+import yweather
 
 
 # Measure every 5 minutes
@@ -155,9 +155,8 @@ def main():
              frequency, retention_period)
     weather_stream_token = plotly['weather-stream-token']
     weather = config['weather']
-    owm_api_key = weather['api-key']
-    owm_place = weather['place']
-    LOG.info('Monitoring weather at %r', owm_place)
+    place = weather['place']
+    LOG.info('Monitoring weather at %r', place)
 
     # Make sure we can communicate with the devices
     devs = get_sensors()
@@ -174,8 +173,9 @@ def main():
         name = name_format % {'bus': bus, 'ports': ports, 'num': n}
         sensor_names.append(name)
 
-    # Connect to OWM weather service
-    owm = pyowm.OWM(owm_api_key)
+    # Connect to weather service
+    weather_client = yweather.Client()
+    location_id = weather_client.fetch_woeid(place)
 
     # Make sure our plotly login details work
     max_points = 24 * (60 / frequency) * retention_period
@@ -196,9 +196,9 @@ def main():
         x = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         # Reported temperature from OWM
         try:
-            observation = owm.weather_at_place(owm_place)
-            w = observation.get_weather()
-            temp = w.get_temperature('fahrenheit')['temp']
+            weather = weather_client.fetch_weather(location_id, metric=False)
+            temp = weather['condition']['temp']
+            history_entry['weather'] = temp
         except Exception:
             LOG.warning('Could not get weather report', exc_info=True)
         else:
