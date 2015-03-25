@@ -92,7 +92,8 @@ def create_plot(username, api_key,
         showlegend=True,
     )
     fig = Figure(data=traces, layout=layout)
-    LOG.info('Output graph visible at %s', py.plot(fig, filename=title))
+    plot_url = py.plot(fig, filename=title, extend=True, auto_open=False)
+    LOG.info('Output graph visible at %s', plot_url)
 
     sensor_streams = [
         py.Stream(t)
@@ -123,6 +124,11 @@ def main():
         '--pid-file', '-p',
         default=None,
         help='Where to write the pid file. Defaults to not writing one.',
+    )
+    parser.add_argument(
+        '--history-file',
+        default=None,
+        help='Where to write the recording history for playback',
     )
     parser.add_argument(
         '--verbose', '-v',
@@ -190,11 +196,44 @@ def main():
         max_points,
     )
 
+    history_file = (
+        args.history_file
+        or
+        os.path.join(os.path.dirname(args.config_file), 'tempmon.dat')
+    )
+    if os.path.exists(history_file):
+        LOG.info('Loading history from %s', history_file)
+        with open(history_file, 'r') as f:
+            history = yaml.load(f)
+        LOG.info('Found %d history points', len(history))
+        if history:
+            LOG.info('Posting historical data')
+            for entry in history:
+                x = entry['date']
+                try:
+                    weather_stream.write({'x': x, 'y': entry['weather']})
+                except Exception:
+                    LOG.warning('Could not update plotly', exc_info=True)
+                for stream, sensor_entry in zip(sensor_streams,
+                                                entry['sensors']):
+                    try:
+                        stream.write({'x': x, 'y': sensor_entry['temp']})
+                    except Exception:
+                        LOG.warning('Could not update plotly', exc_info=True)
+    else:
+        history = []
+        LOG.info('History file %s not found', history_file)
+
     LOG.info('Starting polling')
     delay = frequency * 60
     while True:
         x = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-        # Reported temperature from OWM
+        history_entry = {
+            'date': x,
+            'weather': None,
+            'sensors': []
+        }
+        # Reported temperature from weather service
         try:
             weather = weather_client.fetch_weather(location_id, metric=False)
             temp = weather['condition']['temp']
@@ -207,9 +246,10 @@ def main():
             except Exception:
                 LOG.warning('Could not update plotly', exc_info=True)
         # Temperature sensors
-        for dev, stream in zip(devs, sensor_streams):
+        for dev, stream, token in zip(devs, sensor_streams, sensor_tokens):
             try:
                 temp = dev.get_temperature(format=units)
+                history_entry['sensors'].append({'temp': temp, 'token': token})
             except Exception:
                 LOG.warning('Could not read temperature', exc_info=True)
                 continue
@@ -218,6 +258,11 @@ def main():
             except Exception:
                 LOG.warning('Could not update plotly', exc_info=True)
                 continue
+        # Save the history
+        history.append(history_entry)
+        history = history[:max_points]
+        with open(history_file, 'w') as f:
+            yaml.dump(history, f)
         # delay between stream posts is expressed as a frequency
         # in minutes
         time.sleep(delay)
