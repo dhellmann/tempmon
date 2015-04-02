@@ -183,7 +183,26 @@ def main():
     weather_client = yweather.Client()
     location_id = weather_client.fetch_woeid(place)
 
-    # Make sure our plotly login details work
+    history_file = (
+        args.history_file
+        or
+        os.path.join(os.path.dirname(args.config_file), 'tempmon.dat')
+    )
+    if os.path.exists(history_file):
+        LOG.info('Loading history from %s', history_file)
+        try:
+            with open(history_file, 'r') as f:
+                history = yaml.load(f)
+        except Exception:
+            LOG.warning('Could not load history file', exc_info=True)
+            history = []
+        else:
+            LOG.info('Found %d history points', len(history))
+    else:
+        history = []
+        LOG.info('History file %s not found', history_file)
+
+    # Connect to plot.ly
     max_points = 24 * (60 / frequency) * retention_period
     sensor_streams, weather_stream = create_plot(
         username,
@@ -196,33 +215,20 @@ def main():
         max_points,
     )
 
-    history_file = (
-        args.history_file
-        or
-        os.path.join(os.path.dirname(args.config_file), 'tempmon.dat')
-    )
-    if os.path.exists(history_file):
-        LOG.info('Loading history from %s', history_file)
-        with open(history_file, 'r') as f:
-            history = yaml.load(f)
-        LOG.info('Found %d history points', len(history))
-        if history:
-            LOG.info('Posting historical data')
-            for entry in history:
-                x = entry['date']
+    if history:
+        LOG.info('Posting historical data')
+        for entry in history:
+            x = entry['date']
+            try:
+                weather_stream.write({'x': x, 'y': entry['weather']})
+            except Exception:
+                LOG.warning('Could not update plotly', exc_info=True)
+            for stream, sensor_entry in zip(sensor_streams,
+                                            entry['sensors']):
                 try:
-                    weather_stream.write({'x': x, 'y': entry['weather']})
+                    stream.write({'x': x, 'y': sensor_entry['temp']})
                 except Exception:
                     LOG.warning('Could not update plotly', exc_info=True)
-                for stream, sensor_entry in zip(sensor_streams,
-                                                entry['sensors']):
-                    try:
-                        stream.write({'x': x, 'y': sensor_entry['temp']})
-                    except Exception:
-                        LOG.warning('Could not update plotly', exc_info=True)
-    else:
-        history = []
-        LOG.info('History file %s not found', history_file)
 
     LOG.info('Starting polling')
     delay = frequency * 60
