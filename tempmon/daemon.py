@@ -260,7 +260,7 @@ def main():
                 continue
         # Save the history
         history.append(history_entry)
-        history = history[max_points:]
+        history = history[-1 * max_points:]
         with open(history_file, 'w') as f:
             yaml.dump(history, f)
         # delay between stream posts is expressed as a frequency
