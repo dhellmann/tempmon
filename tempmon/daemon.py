@@ -11,6 +11,8 @@ from temperusb import TemperHandler
 import yaml
 import yweather
 
+from tempmon import db
+
 
 # Measure every 5 minutes
 DEFAULT_FREQUENCY = 5
@@ -95,11 +97,11 @@ def create_plot(username, api_key,
     plot_url = py.plot(fig, filename=title, extend=True, auto_open=False)
     LOG.info('Output graph visible at %s', plot_url)
 
-    sensor_streams = [
-        py.Stream(t)
+    sensor_streams = {
+        t: py.Stream(t)
         for t in sensor_tokens
-    ]
-    for s in sensor_streams:
+    }
+    for s in sensor_streams.values():
         s.open()
 
     weather_stream = py.Stream(weather_token)
@@ -186,21 +188,9 @@ def main():
     history_file = (
         args.history_file
         or
-        os.path.join(os.path.dirname(args.config_file), 'tempmon.dat')
+        os.path.join(os.path.dirname(args.config_file), 'tempmon.db')
     )
-    if os.path.exists(history_file):
-        LOG.info('Loading history from %s', history_file)
-        try:
-            with open(history_file, 'r') as f:
-                history = yaml.load(f)
-        except Exception:
-            LOG.warning('Could not load history file', exc_info=True)
-            history = []
-        else:
-            LOG.info('Found %d history points', len(history))
-    else:
-        history = []
-        LOG.info('History file %s not found', history_file)
+    history_db, history_points = db.open_db(history_file)
 
     # Connect to plot.ly
     max_points = 24 * (60 / frequency) * retention_period
@@ -215,20 +205,22 @@ def main():
         max_points,
     )
 
-    if history:
+    if history_points:
         LOG.info('Posting historical data')
-        for entry in history:
+        weather, readings = db.get_history(history_db)
+        for entry in weather:
             x = entry['date']
             try:
-                weather_stream.write({'x': x, 'y': entry['weather']})
+                weather_stream.write({'x': x, 'y': entry['temperature']})
             except Exception:
                 LOG.warning('Could not update plotly', exc_info=True)
-            for stream, sensor_entry in zip(sensor_streams,
-                                            entry['sensors']):
-                try:
-                    stream.write({'x': x, 'y': sensor_entry['temp']})
-                except Exception:
-                    LOG.warning('Could not update plotly', exc_info=True)
+        for entry in readings:
+            stream = sensor_streams[entry['token']]
+            x = entry['date']
+            try:
+                stream.write({'x': x, 'y': entry['temperature']})
+            except Exception:
+                LOG.warning('Could not update plotly', exc_info=True)
 
     LOG.info('Starting polling')
     delay = frequency * 60
@@ -243,7 +235,7 @@ def main():
         try:
             weather = weather_client.fetch_weather(location_id, metric=False)
             temp = weather['condition']['temp']
-            history_entry['weather'] = temp
+            db.store_weather(history_db, x, temp)
         except Exception:
             LOG.warning('Could not get weather report', exc_info=True)
         else:
@@ -252,10 +244,13 @@ def main():
             except Exception:
                 LOG.warning('Could not update plotly', exc_info=True)
         # Temperature sensors
-        for dev, stream, token in zip(devs, sensor_streams, sensor_tokens):
+        sensor_log_data = []
+        for dev, token in zip(devs, sensor_tokens):
+            stream = sensor_streams[token]
             try:
                 temp = dev.get_temperature(format=units)
-                history_entry['sensors'].append({'temp': temp, 'token': token})
+                db.store_sensor_reading(history_db, x, temp, token)
+                sensor_log_data.append(temp)
             except Exception:
                 LOG.warning('Could not read temperature', exc_info=True)
                 continue
@@ -264,11 +259,12 @@ def main():
             except Exception:
                 LOG.warning('Could not update plotly', exc_info=True)
                 continue
+
+        LOG.info('outside=%s sensors=%s',
+                 weather['condition']['temp'],
+                 ', '.join(str(x) for x in sensor_log_data))
         # Save the history
-        history.append(history_entry)
-        history = history[-1 * max_points:]
-        with open(history_file, 'w') as f:
-            yaml.dump(history, f)
+        history_db.commit()
         # delay between stream posts is expressed as a frequency
         # in minutes
         time.sleep(delay)
