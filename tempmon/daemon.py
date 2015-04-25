@@ -68,7 +68,7 @@ def create_plot(username, api_key,
             name=n,
             stream={
                 'token': t,
-                'maxpoints': max_points,
+                # 'maxpoints': max_points,
             }
         )
         for t, n in zip(sensor_tokens, sensor_names)
@@ -80,7 +80,7 @@ def create_plot(username, api_key,
             name='Outside Temperature',
             stream={
                 'token': weather_token,
-                'maxpoints': max_points,
+                # 'maxpoints': max_points,
             }
         )
     )
